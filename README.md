@@ -57,6 +57,18 @@ cd models/spn_t1
 bash make.sh
 ```
 
+### to onnx
+参照 https://github.com/BangwenHe/AnyNet 及 https://github.com/smartadpole/Lac-GwcNet 修复了导出 onnx 时的错误；   
+
+```shell
+# to onnx
+python3 convert_to_onnx.py --loadmodel /work/model/depth/stereo/AnyNet/official/sceneflow/sceneflow.tar
+# slim
+python -m onnxsim --skip-fuse-bn anynet.onnx anynet_sim.onnx
+# to rknn
+# todo
+```
+
 ### Train
 Firstly, we use the following command to pretrained AnyNet on Scene Flow
 
@@ -118,7 +130,13 @@ python finetune.py --maxdisp 192 --with_spn --datapath path-to-your-dataset/ \
     --pretrained checkpoint/scenflow/sceneflow.tar --datatype other
 ```
 
+### export ONNX model
 
+For exporting the model, we don't need to compile the spn module. Prerequisite is that you have downloaded the [pth checkpoint](https://drive.google.com/file/d/18Vi68rQO-vcBn3882vkumIWtGggZQDoU/view?usp=sharing) and the [kitti2012](http://www.cvlibs.net/datasets/kitti/eval_stereo.php) dataset.
+
+```
+python finetune.py --maxdisp 192 --datapath path-to-kitti/training/    --save_path results/kitti2012 --datatype 2012 --pretrained checkpoint/kitti2012_ck/checkpoint.tar --evaluate --test_bsize 1
+```
 
 
 ## Results

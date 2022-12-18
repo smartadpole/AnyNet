@@ -4,6 +4,22 @@ import torch.nn as nn
 import torch.utils.data
 import torch.nn.functional as F
 
+
+class MyUpsampling2d(nn.Module):
+    def __init__(self, size=None, scale_factor=None):
+        super(MyUpsampling2d, self).__init__()
+        self.size = size
+        self.scale_factor = scale_factor
+    
+    def forward(self, x):
+        if self.size is not None:
+            return F.interpolate(x, size=self.size, mode='bilinear', align_corners=False)
+        elif self.scale_factor is not None:
+            return F.interpolate(x, scale_factor=self.scale_factor, mode='bilinear', align_corners=False)
+        else:
+            raise ValueError('size or scale_factor must be defined')
+
+
 def preconv2d(in_planes, out_planes, kernel_size, stride, pad, dilation=1, bn=True):
     if bn:
         return nn.Sequential(
@@ -27,7 +43,7 @@ class unetUp(nn.Module):
                 nn.ConvTranspose2d(in_size, out_size, kernel_size=2, stride=2, padding=0)
             )
         else:
-            self.up = nn.UpsamplingBilinear2d(scale_factor=2)
+            self.up = MyUpsampling2d(scale_factor=2)
             in_size = int(in_size * 1.5)
 
         self.conv = nn.Sequential(
@@ -40,6 +56,30 @@ class unetUp(nn.Module):
         buttom, right = inputs1.size(2)%2, inputs1.size(3)%2
         outputs2 = F.pad(outputs2, (0, -right, 0, -buttom))
         return self.conv(torch.cat([inputs1, outputs2], 1))
+
+
+class GateRecurrent(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, X: torch.Tensor, G1, G2, G3):
+        width = X.size(3)
+        H = torch.zeros_like(X)
+        for t in range(width):
+            g1 = G1[..., t]
+            g2 = G2[..., t]
+            g3 = G3[..., t]
+
+            h1 = F.pad(H[:, :, :-1, t-1], (1, 0))
+            h2 = H[:, :, :, t-1]
+            h3 = F.pad(H[:, :, 1:, t-1], (0, 1))
+
+            g = g1 + g2 + g3
+            x = X[..., t]
+            H[..., t] = (1 - g) * x + (h1 * g1 + h2 * g2 + h3 * g3)
+
+        return H
+
 
 class feature_extraction_conv(nn.Module):
     def __init__(self, init_channels,  nblock=2):
