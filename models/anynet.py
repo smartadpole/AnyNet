@@ -8,6 +8,11 @@ import math
 from .submodules import post_3dconvs,feature_extraction_conv, GateRecurrent
 import sys
 
+def abs(data):
+    neg = data * -1
+    ret = torch.max(data, neg)
+
+    return ret
 
 def grid_sample(im, grid, align_corners=False):
     """Given an input and a flow-field grid, computes the output using input
@@ -176,7 +181,7 @@ class AnyNet(nn.Module):
         cost = torch.zeros((feat_l.size()[0], maxdisp//stride, feat_l.size()[2], feat_l.size()[3]), device=feat_l.device)
         for i in range(0, maxdisp, stride):
             if i > 0:
-                cost[:, i//stride, :, :i] = feat_l[:, :, :, :i].abs().sum(1)
+                cost[:, i//stride, :, :i] = abs(feat_l[:, :, :, :i]).sum(1)
 
             if i > 0:
                 cost[:, i//stride, :, i:] = torch.norm(feat_l[:, :, :, i:] - feat_r[:, :, :, :-i], 1, 1)
@@ -233,7 +238,7 @@ class AnyNet(nn.Module):
         if self.refine_spn:
             spn_out = self.refine_spn[0](F.interpolate(left, (img_size[2]//4, img_size[3]//4), mode='bilinear', align_corners=True))
             G1, G2, G3 = spn_out[:,:self.spn_init_channels,:,:], spn_out[:,self.spn_init_channels:self.spn_init_channels*2,:,:], spn_out[:,self.spn_init_channels*2:,:,:]
-            sum_abs = G1.abs() + G2.abs() + G3.abs()
+            sum_abs = abs(G1) + abs(G2) + abs(G3)
             G1 = torch.div(G1, sum_abs + 1e-8)
             G2 = torch.div(G2, sum_abs + 1e-8)
             G3 = torch.div(G3, sum_abs + 1e-8)
